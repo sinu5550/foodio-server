@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
@@ -17,19 +21,17 @@ export class MenuItemService {
     isAvailable?: string | boolean;
     file: Express.Multer.File;
   }) {
-    
     let imageUrl = null;
     if (data.file) {
       const upload = await this.cloudinary.uploadImage(data.file);
       imageUrl = upload.secure_url;
     }
 
-    
     return this.prisma.menuItem.create({
       data: {
         name: data.name,
         description: data.description,
-        price: Number(data.price), 
+        price: Number(data.price),
         image: imageUrl,
         categoryId: data.categoryId,
         isAvailable:
@@ -90,6 +92,21 @@ export class MenuItemService {
   }
 
   async remove(id: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id },
+      include: { orderItems: true },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    if (menuItem.orderItems.length > 0) {
+      throw new ConflictException(
+        'Cannot delete menu item because it is part of existing orders',
+      );
+    }
+
     return this.prisma.menuItem.delete({
       where: { id },
     });

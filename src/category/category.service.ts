@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -31,6 +35,21 @@ export class CategoryService {
   }
 
   async remove(id: string) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      include: { menuItems: true },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    if (category.menuItems.length > 0) {
+      throw new ConflictException(
+        'Cannot delete category because it is being used by menu items',
+      );
+    }
+
     return this.prisma.category.delete({
       where: { id },
     });
